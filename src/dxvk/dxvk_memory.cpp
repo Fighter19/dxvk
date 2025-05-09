@@ -1118,8 +1118,47 @@ namespace dxvk {
     // If global buffers are enabled for this allocation, pad the allocation size
     // to a multiple of the global buffer alignment. This can happen when we create
     // a dedicated allocation for a large resource.
+    bool isGlobalBufferCreated = false;
+    VkBuffer buffer = VK_NULL_HANDLE;
     if (type.bufferUsage && !next)
+    {
       size = align(size, GlobalBufferAlignment);
+
+
+      VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+      bufferInfo.size = size;
+      bufferInfo.usage = type.bufferUsage;
+      m_sharingModeInfo.fill(bufferInfo);
+
+      VkResult status = vk->vkCreateBuffer(vk->device(), &bufferInfo, nullptr, &buffer);
+
+      if (status == VK_SUCCESS) {
+        VkBufferMemoryRequirementsInfo2 memInfo = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2 };
+        memInfo.buffer = buffer;
+
+        VkMemoryRequirements2 requirements = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
+        vk->vkGetBufferMemoryRequirements2(vk->device(), &memInfo, &requirements);
+
+        size = requirements.memoryRequirements.size;
+
+        // TODO: Is there any problem with having allocated more? I don't think so
+        if ((requirements.memoryRequirements.size >= size)
+         && (requirements.memoryRequirements.memoryTypeBits & (1u << type.index))) {
+          isGlobalBufferCreated = true;
+        }
+
+        if (!buffer)
+          vk->vkDestroyBuffer(vk->device(), buffer, nullptr);
+      }
+
+      if (!buffer) {
+        Logger::warn(str::format("Failed to create global buffer:",
+          "\n  size:  ", std::dec, size,
+          "\n  usage: ", std::hex, type.bufferUsage,
+          "\n  type:  ", std::dec, type.index));
+      }
+    }
+
 
     // Preemptively free some unused allocations to reduce memory waste
     freeEmptyChunksInHeap(*type.heap, size, high_resolution_clock::now());
@@ -1174,47 +1213,24 @@ namespace dxvk {
     if (m_device->features().extPageableDeviceLocalMemory.pageableDeviceLocalMemory)
       vk->vkSetDeviceMemoryPriorityEXT(vk->device(), result.memory, priorityInfo.priority);
 
-    // Create global buffer if the allocation supports it
-    if (type.bufferUsage && !next) {
-      VkBuffer buffer = VK_NULL_HANDLE;
-
-      VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-      bufferInfo.size = size;
-      bufferInfo.usage = type.bufferUsage;
-      m_sharingModeInfo.fill(bufferInfo);
-
-      VkResult status = vk->vkCreateBuffer(vk->device(), &bufferInfo, nullptr, &buffer);
+    if (isGlobalBufferCreated) {
+      VkResult status = vk->vkBindBufferMemory(vk->device(), buffer, result.memory, 0);
 
       if (status == VK_SUCCESS) {
-        VkBufferMemoryRequirementsInfo2 memInfo = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2 };
-        memInfo.buffer = buffer;
+        result.buffer = buffer;
 
-        VkMemoryRequirements2 requirements = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
-        vk->vkGetBufferMemoryRequirements2(vk->device(), &memInfo, &requirements);
-
-        if ((requirements.memoryRequirements.size == size)
-         && (requirements.memoryRequirements.memoryTypeBits & (1u << type.index))) {
-          status = vk->vkBindBufferMemory(vk->device(), buffer, result.memory, 0);
-
-          if (status == VK_SUCCESS) {
-            result.buffer = buffer;
-
-            if (type.bufferUsage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-              result.gpuVa = getBufferDeviceAddress(buffer);
-          }
-        }
-
-        if (!result.buffer)
-          vk->vkDestroyBuffer(vk->device(), buffer, nullptr);
+        if (type.bufferUsage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+          result.gpuVa = getBufferDeviceAddress(buffer);
       }
-
-      if (!result.buffer) {
-        Logger::warn(str::format("Failed to create global buffer:",
+      else {
+        Logger::warn(str::format("Failed to bind global buffer:",
           "\n  size:  ", std::dec, size,
           "\n  usage: ", std::hex, type.bufferUsage,
           "\n  type:  ", std::dec, type.index));
+          vk->vkDestroyBuffer(vk->device(), buffer, nullptr);
       }
     }
+
 
     result.cookie = ++m_nextCookie;
 
