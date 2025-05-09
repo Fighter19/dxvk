@@ -332,6 +332,10 @@ namespace dxvk {
     if (m_hudView) {
       hudDescriptor.imageView = m_hudView->handle();
       hudDescriptor.imageLayout = m_hudImage->info().layout;
+    } else {
+      // This is not clean, but we need to bind a descriptor, until null descriptors are supported
+      hudDescriptor.imageView = srcView->handle();
+      hudDescriptor.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
 
     VkDescriptorImageInfo cursorDescriptor = { };

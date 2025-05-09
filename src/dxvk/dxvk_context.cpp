@@ -4623,7 +4623,7 @@ namespace dxvk {
 
     std::array<VkDescriptorImageInfo, 2> descriptorImages = {{
       { VK_NULL_HANDLE, views.srcImageView->handle(), srcLayout },
-      { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED },
+      { VK_NULL_HANDLE, views.srcStencilView->handle(), VK_IMAGE_LAYOUT_UNDEFINED },
     }};
 
     if (views.srcStencilView) {
@@ -6541,7 +6541,7 @@ namespace dxvk {
 
               m_cmd->track(res.bufferSlice.buffer(), DxvkAccess::Read);
             } else {
-              descriptorInfo.buffer.buffer = VK_NULL_HANDLE;
+              descriptorInfo.buffer.buffer = createZeroBuffer(1)->getSliceHandle().handle;
               descriptorInfo.buffer.offset = 0;
               descriptorInfo.buffer.range = VK_WHOLE_SIZE;
             }
@@ -6559,7 +6559,7 @@ namespace dxvk {
               m_cmd->track(res.bufferSlice.buffer(), (binding.access & vk::AccessWriteMask)
                 ? DxvkAccess::Write : DxvkAccess::Read);
             } else {
-              descriptorInfo.buffer.buffer = VK_NULL_HANDLE;
+              descriptorInfo.buffer.buffer = createZeroBuffer(1)->getSliceHandle().handle;
               descriptorInfo.buffer.offset = 0;
               descriptorInfo.buffer.range = VK_WHOLE_SIZE;
             }
