@@ -326,9 +326,9 @@ namespace dxvk {
     // Always enable robust buffer access
     enabledFeatures.core.features.robustBufferAccess = VK_TRUE;
 
-    // Always enable features used by the HUD
-    enabledFeatures.core.features.multiDrawIndirect = VK_TRUE;
-    enabledFeatures.vk11.shaderDrawParameters = VK_TRUE;
+    // Enable features used by the HUD if supported
+    enabledFeatures.core.features.multiDrawIndirect = m_deviceFeatures.core.features.multiDrawIndirect;
+    enabledFeatures.vk11.shaderDrawParameters = m_deviceFeatures.vk11.shaderDrawParameters;
 
     // Enable variable multisample rate if supported
     enabledFeatures.core.features.variableMultisampleRate =
@@ -421,9 +421,9 @@ namespace dxvk {
     // Require robustBufferAccess2 since we use the robustness alignment
     // info in a number of places, and require null descriptor support
     // since we no longer have a fallback for those in the backend
-    enabledFeatures.extRobustness2.robustBufferAccess2 = VK_TRUE;
+    enabledFeatures.extRobustness2.robustBufferAccess2 = m_deviceFeatures.extRobustness2.robustBufferAccess2;
     enabledFeatures.extRobustness2.robustImageAccess2 = m_deviceFeatures.extRobustness2.robustImageAccess2;
-    enabledFeatures.extRobustness2.nullDescriptor = VK_TRUE;
+    enabledFeatures.extRobustness2.nullDescriptor = m_deviceFeatures.extRobustness2.nullDescriptor;
 
     // We use this to avoid decompressing SPIR-V shaders in some situations
     enabledFeatures.extShaderModuleIdentifier.shaderModuleIdentifier =
